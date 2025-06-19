@@ -11,6 +11,7 @@ const app = express();
 const bot = new discord.Client({ intents: [discord.GatewayIntentBits.Guilds, discord.GatewayIntentBits.GuildMessages, discord.GatewayIntentBits.MessageContent] });
 
 const setsCache = new Map();
+console.log("Bot starting...");
 
 bot.once('ready', () => {
   console.log(`Logged in as ${bot.user.tag}`);
