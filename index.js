@@ -87,23 +87,45 @@ function getNatureName(plus, minus) {
 }
 
 function parseField(rawInput) {
-  const weatherMatch = rawInput.match(/\b(in|under)\s+(Rain|Sun|Sand|Hail|Snow)/i);
-  const terrainMatch = rawInput.match(/\b(on)\s+(Electric|Grassy|Psychic|Misty)\s+Terrain/i);
+  const weatherMatch = rawInput.match(/\b(?:in)\s+(Rain|Sun|Sand|Hail|Snow)/i);
+  const terrainMatch = rawInput.match(/\b(?:on)\s+(Electric|Grassy|Psychic|Misty)\s+Terrain/i);
+  const screensMatch = rawInput.match(/\bunder\s+(Light Screen|Reflect|Aurora Veil)/i);
+  const srMatch = rawInput.match(/\bafter\s+Stealth Rock/i);
+  const spikesMatch = rawInput.match(/(\d)\s+layers?\s+of\s+Spikes/i);
+  const critMatch = rawInput.match(/\bon\s+a\s+critical\s+hit/i);
+
   return {
-    weather: weatherMatch ? weatherMatch[2] : undefined,
-    terrain: terrainMatch ? terrainMatch[2] : undefined
+    weather: weatherMatch ? weatherMatch[1] : undefined,
+    terrain: terrainMatch ? terrainMatch[1] : undefined,
+    isLightScreen: screensMatch?.[1] === 'Light Screen',
+    isReflect: screensMatch?.[1] === 'Reflect',
+    isAuroraVeil: screensMatch?.[1] === 'Aurora Veil',
+    isSR: !!srMatch,
+    spikes: spikesMatch ? parseInt(spikesMatch[1], 10) : 0,
+    isCriticalHit: !!critMatch
   };
 }
+
 
 function parseCalcInput(rawInput) {
   // First, extract field data and get a cleaned input string for Pokémon/move parsing
   const fieldData = parseField(rawInput);
 
-  // Create a version of the input string without weather/terrain for parsing Pokemon names
   let cleanedInputForPokemon = rawInput
-    .replace(/\b(in|under)\s+(Rain|Sun|Sand|Hail|Snow)/gi, '') // Remove weather
-    .replace(/\b(on)\s+(Electric|Grassy|Psychic|Misty)\s+Terrain/gi, '') // Remove terrain
+    // Remove weather
+    .replace(/\b(in|under)\s+(Rain|Sun|Sand|Hail|Snow)/gi, '')
+    // Remove terrain
+    .replace(/\b(on)\s+(Electric|Grassy|Psychic|Misty)\s+Terrain/gi, '')
+    // Remove screens
+    .replace(/\bunder\s+(Light Screen|Reflect|Aurora Veil)/gi, '')
+    // Remove Stealth Rock
+    .replace(/\bafter\s+Stealth Rock/gi, '')
+    // Remove Spikes
+    .replace(/\b(?:and\s+)?(?:\d+\s+)?layers?\s+of\s+Spikes/gi, '')
+    // Remove critical hit mention
+    .replace(/\bon\s+a\s+critical\s+hit/gi, '')
     .trim();
+
 
   const match = cleanedInputForPokemon.match(/(.+?) using (.+?) vs (.+)/i);
   if (!match) return null;
@@ -264,10 +286,20 @@ bot.on('messageCreate', async message => {
     console.log('Parsed Field Data:', parsed.fieldData);
 
     const { attacker, defender, move, fieldData } = parsed;
-    const { weather, terrain } = fieldData;
+    const {
+      weather,
+      terrain,
+      isLightScreen,
+      isReflect,
+      isAuroraVeil,
+      isSR,
+      spikes,
+      isCriticalHit
+    } = fieldData;
+
 
     const gen = Generations.get(9);
-    const field = new Field({ weather, terrain });
+    const field = new Field({ weather, terrain, isLightScreen, isReflect, isAuroraVeil, isSR, spikes, isCriticalHit });
 
     try {
       var atk = new Pokemon(gen, attacker.name, {
