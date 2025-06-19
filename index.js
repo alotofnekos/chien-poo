@@ -1,0 +1,441 @@
+import discord from 'discord.js';
+import { config } from 'dotenv';
+import express from 'express';
+import keepAlive from './server.js';
+import { Generations, Pokemon, Move, calculate, Field } from '@smogon/calc';
+import fetch from 'node-fetch';
+
+config();
+
+const app = express();
+const bot = new discord.Client({ intents: [discord.GatewayIntentBits.Guilds, discord.GatewayIntentBits.GuildMessages, discord.GatewayIntentBits.MessageContent] });
+
+const setsCache = new Map();
+
+bot.once('ready', () => {
+  console.log(`Logged in as ${bot.user.tag}`);
+});
+
+function statMap(stat) {
+  return {
+    hp: 'hp',
+    atk: 'atk',
+    def: 'def',
+    spa: 'spa',
+    spd: 'spd',
+    spe: 'spe'
+  }[stat.toLowerCase()];
+}
+
+function detectNatureFromEVs(str) {
+  // Look for patterns like "252+ SpA" or "252- Atk"
+  const matches = [...str.matchAll(/(\d+)([+\-])\s*(HP|Atk|Def|SpA|SpD|Spe)/gi)];
+  let plus = null, minus = null;
+
+  for (const [, , sign, stat] of matches) {
+    const mapped = statMap(stat);
+    if (sign === '+') {
+      plus = mapped;
+    } else if (sign === '-') {
+      minus = mapped;
+    }
+  }
+
+  // If we have a + nature but no explicit - nature, we need to infer the - stat
+  if (plus && !minus) {
+    // Common nature patterns for damage calculation
+    const commonMinusStats = {
+      'atk': 'spa',  // Physical attackers often drop SpA
+      'spa': 'atk',  // Special attackers often drop Atk
+      'spe': 'atk',  // Speed boosters often drop Atk
+      'def': 'spa',  // Defensive mons often drop SpA
+      'spd': 'atk'  // Special defensive mons often drop Atk
+    };
+    minus = commonMinusStats[plus] || 'atk'; // Default to dropping Atk
+  }
+
+  return plus && minus ? getNatureName(plus, minus) : null;
+}
+
+function getNatureName(plus, minus) {
+  const natureMap = {
+    'atk-def': 'Lonely',
+    'atk-spa': 'Adamant',
+    'atk-spd': 'Naughty',
+    'atk-spe': 'Brave',
+    'def-atk': 'Bold',
+    'def-spa': 'Impish',
+    'def-spd': 'Lax',
+    'def-spe': 'Relaxed',
+    'spa-atk': 'Modest',
+    'spa-def': 'Mild',
+    'spa-spd': 'Rash',
+    'spa-spe': 'Quiet',
+    'spd-atk': 'Calm',
+    'spd-def': 'Gentle',
+    'spd-spa': 'Careful',
+    'spd-spe': 'Sassy',
+    'spe-atk': 'Timid',
+    'spe-def': 'Hasty',
+    'spe-spa': 'Jolly',
+    'spe-spd': 'Naive'
+  };
+
+  const key = `${plus}-${minus}`;
+  return natureMap[key] || 'Hardy'; // Default to Hardy (neutral nature)
+}
+
+function parseField(rawInput) {
+  const weatherMatch = rawInput.match(/\b(in|under)\s+(Rain|Sun|Sand|Hail|Snow)/i);
+  const terrainMatch = rawInput.match(/\b(on)\s+(Electric|Grassy|Psychic|Misty)\s+Terrain/i);
+  return {
+    weather: weatherMatch ? weatherMatch[2] : undefined,
+    terrain: terrainMatch ? terrainMatch[2] : undefined
+  };
+}
+
+function parseCalcInput(rawInput) {
+  // First, extract field data and get a cleaned input string for Pokémon/move parsing
+  const fieldData = parseField(rawInput);
+
+  // Create a version of the input string without weather/terrain for parsing Pokemon names
+  let cleanedInputForPokemon = rawInput
+    .replace(/\b(in|under)\s+(Rain|Sun|Sand|Hail|Snow)/gi, '') // Remove weather
+    .replace(/\b(on)\s+(Electric|Grassy|Psychic|Misty)\s+Terrain/gi, '') // Remove terrain
+    .trim();
+
+  const match = cleanedInputForPokemon.match(/(.+?) using (.+?) vs (.+)/i);
+  if (!match) return null;
+
+  const [, attackerStr, move, defenderStr] = match;
+
+  function parseSide(str) {
+    const evs = {}, boosts = {};
+
+    // Parse nature from + and - indicators
+    const natureData = detectNatureFromEVs(str);
+
+    // Parse ability from parentheses
+    const abilityMatch = str.match(/\(([^)]+)\)/);
+    const ability = abilityMatch ? abilityMatch[1].trim() : null;
+
+    // Parse EVs and boosts - updated regex to handle + and - as nature indicators
+    const evMatches = [...str.matchAll(/(\d+)([+\-]?)\s*(HP|Atk|Def|SpA|SpD|Spe)/gi)];
+    for (const [, rawVal, sign, stat] of evMatches) {
+      const val = parseInt(rawVal);
+      const mappedStat = statMap(stat);
+
+      // If it's just a number with +/- (like 252+), it's EVs with nature indicator
+      if (sign === '+' || sign === '-') {
+        evs[mappedStat] = val;
+      }
+      // If it's a number with explicit boost notation (like +1, -2)
+      else if (/^[+-]\d+$/.test(rawVal)) {
+        boosts[mappedStat] = parseInt(rawVal);
+      }
+      // Otherwise it's just EVs
+      else {
+        evs[mappedStat] = val;
+      }
+    }
+
+    // Clean the string by removing EV/nature patterns and abilities
+    const cleaned = str
+      .replace(/(\d+)[+\-]?\s*(HP|Atk|Def|SpA|SpD|Spe)\s*\/?\s*/gi, '')
+      .replace(/[+\-]\d+\s*(HP|Atk|Def|SpA|SpD|Spe)/gi, '')
+      .replace(/\([^)]+\)/g, '') // Remove ability in parentheses
+      .trim();
+
+    const [name, item] = cleaned.split('@').map(s => s.trim());
+    return { name, item: item || '', evs, boosts, nature: natureData, ability };
+  }
+
+  return {
+    attacker: parseSide(attackerStr),
+    move: move.trim(),
+    defender: parseSide(defenderStr),
+    fieldData: fieldData
+  };
+}
+
+// Function to fetch sets data from Smogon API
+async function fetchSetsData(format) {
+  const cacheKey = format;
+
+  if (setsCache.has(cacheKey)) {
+    return setsCache.get(cacheKey);
+  }
+
+  try {
+    const url = `https://pkmn.github.io/smogon/data/sets/${format}.json`;
+    console.log(`Fetching sets from: ${url}`);
+
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    setsCache.set(cacheKey, data);
+
+    // Cache for 30 minutes
+    setTimeout(() => {
+      setsCache.delete(cacheKey);
+    }, 30 * 60 * 1000);
+
+    return data;
+  } catch (error) {
+    console.error(`Error fetching sets for ${format}:`, error);
+    throw error;
+  }
+}
+
+// Function to search for Pokemon sets
+function findPokemonSets(setsData, pokemonName) {
+  // Normalize the Pokemon name for searching
+  const normalizedSearch = pokemonName.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  for (const [speciesName, sets] of Object.entries(setsData)) {
+    const normalizedSpecies = speciesName.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    if (normalizedSpecies === normalizedSearch ||
+        normalizedSpecies.includes(normalizedSearch) ||
+        normalizedSearch.includes(normalizedSpecies)) {
+      return { species: speciesName, sets };
+    }
+  }
+
+  return null;
+}
+
+// Function to format a moveset for display
+function formatMoveset(species, setName, setData) {
+  let formatted = `\`\`\`${species}`;
+  if (setData.item) formatted += ` @ ${setData.item} \n`;
+  // if (setData.ability) formatted += `Ability: ${setData.ability} \n`;
+  if (setData.evs) {
+    const evStr = Object.entries(setData.evs)
+      .filter(([, value]) => value > 0)
+      .map(([stat, value]) => `${value} ${stat.toUpperCase()}`)
+      .join(' / ');
+    if (evStr) formatted += `EVs: ${evStr}\n`;
+  }
+  if (setData.nature) formatted += `${setData.nature} Nature \n`;
+
+  if (setData.ivs) {
+    const ivStr = Object.entries(setData.ivs)
+      .filter(([, value]) => value < 31)
+      .map(([stat, value]) => `${value} ${stat.toUpperCase()}`)
+      .join(' / ');
+    if (ivStr) formatted += `IVs: ${ivStr}\n`;
+  }
+
+  if (setData.moves && setData.moves.length > 0) {
+    formatted += `- ${setData.moves.join('\n- ')}\n`;
+  }  
+  formatted += `\`\`\``;
+  return formatted;
+}
+
+
+// Message handler
+bot.on('messageCreate', async message => {
+  if (message.author.bot) return;
+
+  const content = message.content.trim();
+
+  // Handle the 'cat calc' command
+  if (content.startsWith('!cat calc ')) {
+    const inputStr = content.slice('!cat calc '.length);
+    const parsed = parseCalcInput(inputStr);
+    if (!parsed) {
+      return message.channel.send('Could not parse input. Use `!cat calc <attacker> using <move> vs <target> [in Rain/on Grassy Terrain]` format.');
+    }
+
+    // debugging
+    console.log('Parsed Attacker:', parsed.attacker.name);
+    console.log('Parsed Attacker Nature:', parsed.attacker.nature);
+    console.log('Parsed Attacker Ability:', parsed.attacker.ability);
+    console.log('Parsed Defender:', parsed.defender.name);
+    console.log('Parsed Defender Nature:', parsed.defender.nature);
+    console.log('Parsed Defender Ability:', parsed.defender.ability);
+    console.log('Parsed Move:', parsed.move);
+    console.log('Parsed Field Data:', parsed.fieldData);
+
+    const { attacker, defender, move, fieldData } = parsed;
+    const { weather, terrain } = fieldData;
+
+    const gen = Generations.get(9);
+    const field = new Field({ weather, terrain });
+
+    try {
+      var atk = new Pokemon(gen, attacker.name, {
+        item: attacker.item || undefined,
+        ability: attacker.ability || undefined,
+        evs: attacker.evs,
+        boosts: attacker.boosts,
+        nature: attacker.nature || undefined
+      });
+      var def = new Pokemon(gen, defender.name, {
+        item: defender.item || undefined,
+        ability: defender.ability || undefined,
+        evs: defender.evs,
+        boosts: defender.boosts,
+        nature: defender.nature || undefined
+      });
+      var mv = new Move(gen, move);
+    } catch (e) {
+      return message.channel.send(`Error parsing Pokémon or move: ${e.message}`);
+    }
+
+    const result = calculate(gen, atk, def, mv, field);
+    await message.channel.send(result.desc());
+  }
+  // Handle the 'cat sets' command
+  else if (content.startsWith('!cat sets ')) {
+    const inputStr = content.slice('!cat sets '.length).trim();
+    const parts = inputStr.split(' ');
+
+    // Default format is gen9ou, but allow users to specify format
+    let format = 'gen9ou';
+    let pokemonName = inputStr;
+
+    // Check if first part looks like a format 
+    if (parts.length > 1 && parts[0].match(/^gen\d+[a-z]+$/i)) {
+      format = parts[0].toLowerCase();
+      pokemonName = parts.slice(1).join(' ');
+    }
+
+    if (!pokemonName) {
+      return message.channel.send('Please specify a Pokémon name. Usage: `!cat sets <pokemon>` or `!cat sets <format> <pokemon>`');
+    }
+
+    try {
+      const setsData = await fetchSetsData(format);
+      const pokemonSets = findPokemonSets(setsData, pokemonName);
+
+      if (!pokemonSets) {
+        return message.channel.send(`No sets found for "${pokemonName}" in ${format.toUpperCase()}. Try a different format or check the spelling.`);
+      }
+
+      const { species, sets } = pokemonSets;
+      const setNames = Object.keys(sets);
+
+      if (setNames.length === 0) {
+        return message.channel.send(`No sets available for ${species} in ${format.toUpperCase()}.`);
+      }
+
+      // Show all sets regardless of count
+      let response = `**${species}** sets in **${format.toUpperCase()}**:\n\n`;
+
+      for (const [setName, setData] of Object.entries(sets)) {
+        response += formatMoveset(species, setName, setData) + '\n';
+        // Discord has a 2000 character limit
+        if (response.length > 1800) {
+          await message.channel.send(response);
+          response = '';
+        }
+      }
+
+      if (response.trim()) {
+        await message.channel.send(response);
+      }
+
+    } catch (error) {
+      console.error('Error fetching sets:', error);
+      await message.channel.send(`Error fetching sets for ${format.toUpperCase()}: ${error.message}`);
+    }
+  }
+
+  // Handle the 'cat set' command (for specific set)
+  else if (content.startsWith('!cat set ')) {
+    const inputStr = content.slice('!cat set '.length).trim();
+    const parts = inputStr.split(' ');
+
+    if (parts.length < 3) {
+      return message.channel.send('Usage: `!cat set <format> <pokemon> <set name>`');
+    }
+
+    const format = parts[0].toLowerCase();
+    const pokemonName = parts[1];
+    const setName = parts.slice(2).join(' ');
+
+    try {
+      const setsData = await fetchSetsData(format);
+      const pokemonSets = findPokemonSets(setsData, pokemonName);
+
+      if (!pokemonSets) {
+        return message.channel.send(`No sets found for "${pokemonName}" in ${format.toUpperCase()}.`);
+      }
+
+      const { species, sets } = pokemonSets;
+
+      // Find the specific set (case-insensitive)
+      const matchingSetName = Object.keys(sets).find(name =>
+        name.toLowerCase() === setName.toLowerCase()
+      );
+
+      if (!matchingSetName) {
+        const availableSets = Object.keys(sets).join(', ');
+        return message.channel.send(`Set "${setName}" not found for ${species}. Available sets: ${availableSets}`);
+      }
+
+      const setData = sets[matchingSetName];
+      const response = `**${species}** in **${format.toUpperCase()}**:\n\n${formatMoveset(species, matchingSetName, setData)}`;
+
+      await message.channel.send(response);
+
+    } catch (error) {
+      console.error('Error fetching specific set:', error);
+      await message.channel.send(`Error fetching set: ${error.message}`);
+    }
+  }
+
+  // Handle the 'cat formats' command
+  else if (content === '!cat formats') {
+    const commonFormats = [
+      'gen9ou - Gen 9 OverUsed',
+      'gen9uu - Gen 9 UnderUsed',
+      'gen9ru - Gen 9 RarelyUsed',
+      'gen9nu - Gen 9 NeverUsed',
+      'gen9monotype - Gen 9 Monotype',
+      'gen9ubers - Gen 9 Ubers',
+      'gen9doublesou - Gen 9 Doubles OU',
+      'gen9nationaldexmonotype - Gen 9 National Dex Monotype',
+      'gen9nationaldex - Gen 9 National Dex',
+      'gen9lc - Gen 9 Little Cup'
+    ];
+
+    await message.channel.send(`**Available formats:**\n${commonFormats.join('\n')}\n\nUse \`!cat sets <format> <pokemon>\` to get sets for a specific format.`);
+  }
+  // Handle the 'cat' command
+  else if (content === '!cat') {
+    try {
+      const res = await fetch('https://api.thecatapi.com/v1/images/search');
+      const data = await res.json();
+      if (data && data.length > 0 && data[0].url) {
+        await message.channel.send(data[0].url);
+      } else {
+        await message.channel.send('😿 Could not find a cat image at the moment.');
+      }
+    } catch (e) {
+      await message.channel.send('😿 Failed to fetch a cat. Something went wrong with the API request.');
+      console.error('Error fetching cat:', e);
+    }
+  }
+  // Handle help command
+  else if (content === '!cat help') {
+    const helpMessage = `**Cat Bot Commands:**
+\`!cat\` - Get a random cat image
+\`!cat calc <attacker> using <move> vs <defender>\` - Calculate damage
+\`!cat sets <pokemon>\` - Get sets for a Pokemon (default: gen9ou)
+\`!cat sets <format> <pokemon>\` - Get sets for a Pokemon in specific format
+\`!cat set <format> <pokemon> <set name>\` - Get a specific set
+\`!cat formats\` - List available formats
+\`!cat help\` - Show this help message`;
+  await message.channel.send(helpMessage);
+  }
+});
+
+keepAlive();
+bot.login(process.env.DISCORD_TOKEN);
