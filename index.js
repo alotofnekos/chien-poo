@@ -30,7 +30,7 @@ function statMap(stat) {
 
 function detectNatureFromEVs(str) {
   // Look for patterns like "252+ SpA" or "252- Atk"
-  const matches = [...str.matchAll(/(\d+)([+\-])\s*(HP|Atk|Def|SpA|SpD|Spe)/gi)];
+  const matches = [...str.matchAll(/(\d+)\s*([+\-])\s*(HP|Atk|Def|SpA|SpD|Spe)/gi)];
   let plus = null, minus = null;
 
   for (const [, , sign, stat] of matches) {
@@ -88,11 +88,11 @@ function getNatureName(plus, minus) {
 
 function parseField(rawInput) {
   const weatherMatch = rawInput.match(/\b(?:in)\s+(Rain|Sun|Sand|Hail|Snow)/i);
-  const terrainMatch = rawInput.match(/\b(?:on)\s+(Electric|Grassy|Psychic|Misty)\s+Terrain/i);
-  const screensMatch = rawInput.match(/\bunder\s+(Light Screen|Reflect|Aurora Veil)/i);
-  const srMatch = rawInput.match(/\bafter\s+Stealth Rock/i);
-  const spikesMatch = rawInput.match(/(\d)\s+layers?\s+of\s+Spikes/i);
-  const gravity = rawInput.match(/\bunder\s+Gravity/i);
+  const terrainMatch = rawInput.match(/\b(?:on|with)\s+(Electric|Grassy|Psychic|Misty)\s+Terrain/i);
+  const screensMatch = rawInput.match(/\b(?:under|with)\s+(Light Screen|Reflect|Aurora Veil)/i);
+  const srMatch = rawInput.match(/\b(?:after|with)\s+Stealth Rock/i);
+  const spikesMatch = rawInput.match(/(?:with\s+)?(\d+)\s+layers?\s+of\s+Spikes/i);
+  const gravityMatch = rawInput.match(/\b(?:under|with)\s+Gravity/i);
 
   return {
     weather: weatherMatch ? weatherMatch[1] : undefined,
@@ -102,10 +102,9 @@ function parseField(rawInput) {
     isAuroraVeil: screensMatch?.[1] === 'Aurora Veil',
     isSR: !!srMatch,
     spikes: spikesMatch ? parseInt(spikesMatch[1], 10) : 0,
-    isGravity: !!gravity
+    isGravity: !!gravityMatch
   };
 }
-
 
 function parseCalcInput(rawInput) {
   // First, extract field data and get a cleaned input string for Pokémon/move parsing
@@ -113,19 +112,18 @@ function parseCalcInput(rawInput) {
 
   let cleanedInputForPokemon = rawInput
     // Remove weather
-    .replace(/\b(in|under)\s+(Rain|Sun|Sand|Hail|Snow)/i, '')
+    .replace(/\b(?:in|under)\s+(Rain|Sun|Sand|Hail|Snow)/gi, '')
     // Remove terrain
-    .replace(/\b(on)\s+(Electric|Grassy|Psychic|Misty)\s+Terrain/i, '')
+    .replace(/\b(?:on|with)\s+(Electric|Grassy|Psychic|Misty)\s+Terrain/gi, '')
     // Remove screens
-    .replace(/\bunder\s+(Light Screen|Reflect|Aurora Veil)/i, '')
+    .replace(/\b(?:under|with)\s+(Light Screen|Reflect|Aurora Veil)/gi, '')
     // Remove Stealth Rock
-    .replace(/\bafter\s+Stealth Rock/i, '')
+    .replace(/\b(?:after|with)\s+Stealth Rock/gi, '')
     // Remove Spikes
-    .replace(/\b(?:and\s+)?(?:\d+\s+)?layers?\s+of\s+Spikes/i, '')
+    .replace(/\b(?:and\s+)?(?:with\s+)?(?:\d+\s+)?layers?\s+of\s+Spikes/gi, '')
     // Remove Gravity
-    .replace(/\bunder\s+Gravity/i, '')
+    .replace(/\b(?:under|with)\s+Gravity/gi, '')
     .trim();
-
 
   const match = cleanedInputForPokemon.match(/(.+?) using (.+?) vs (.+)/i);
   if (!match) return null;
@@ -164,9 +162,10 @@ function parseCalcInput(rawInput) {
 
     // Clean the string by removing EV/nature patterns and abilities
     const cleaned = str
-      .replace(/(\d+)[+\-]?\s*(HP|Atk|Def|SpA|SpD|Spe)\s*\/?\s*/gi, '')
-      .replace(/[+\-]\d+\s*(HP|Atk|Def|SpA|SpD|Spe)/gi, '')
+      .replace(/(\d+)\s*[+\-]?\s*(HP|Atk|Def|SpA|SpD|Spe)(?:\s*\/\s*)?/gi, '') // Remove EVs with optional +/- nature indicators
+      .replace(/[+\-]\d+\s*(HP|Atk|Def|SpA|SpD|Spe)/gi, '') // Remove explicit boosts
       .replace(/\([^)]+\)/g, '') // Remove ability in parentheses
+      .replace(/\s+/g, ' ') // Normalize whitespace
       .trim();
 
     const [name, item] = cleaned.split('@').map(s => s.trim());
@@ -234,8 +233,8 @@ function findPokemonSets(setsData, pokemonName) {
 // Function to format a moveset for display
 function formatMoveset(species, setName, setData) {
   let formatted = `\`\`\`${species}`;
-  if (setData.item) formatted += ` @ ${setData.item} \n`;
-  // if (setData.ability) formatted += `Ability: ${setData.ability} \n`;
+  if (setData.item) formatted += ` @ ${setData.item}\n`;
+  if (setData.ability) formatted += `Ability: ${setData.ability}\n`;
   if (setData.evs) {
     const evStr = Object.entries(setData.evs)
       .filter(([, value]) => value > 0)
@@ -243,7 +242,7 @@ function formatMoveset(species, setName, setData) {
       .join(' / ');
     if (evStr) formatted += `EVs: ${evStr}\n`;
   }
-  if (setData.nature) formatted += `${setData.nature} Nature \n`;
+  if (setData.nature) formatted += `${setData.nature} Nature\n`;
 
   if (setData.ivs) {
     const ivStr = Object.entries(setData.ivs)
@@ -260,7 +259,6 @@ function formatMoveset(species, setName, setData) {
   return formatted;
 }
 
-
 // Message handler
 bot.on('messageCreate', async message => {
   if (message.author.bot) return;
@@ -272,7 +270,7 @@ bot.on('messageCreate', async message => {
     const inputStr = content.slice('!cat calc '.length);
     const parsed = parseCalcInput(inputStr);
     if (!parsed) {
-      return message.channel.send('Could not parse input. Use `!cat calc <attacker> using <move> vs <target> [in Rain/on Grassy Terrain]` format.');
+      return message.channel.send('Could not parse input. Use `!cat calc <attacker> using <move> vs <target> [in Rain/on Grassy Terrain/with Stealth Rock/with Light Screen/with 1 layer of Spikes/under Gravity]` format.');
     }
 
     // debugging
@@ -296,7 +294,6 @@ bot.on('messageCreate', async message => {
       spikes,
       isGravity
     } = fieldData;
-
 
     const gen = Generations.get(9);
     const field = new Field({ weather, terrain, isLightScreen, isReflect, isAuroraVeil, isSR, spikes, isGravity });
@@ -461,12 +458,19 @@ bot.on('messageCreate', async message => {
     const helpMessage = `**Cat Bot Commands:**
 \`!cat\` - Get a random cat image
 \`!cat calc <attacker> using <move> vs <defender>\` - Calculate damage
+  - Field conditions: \`in Rain/Sun/Sand/Hail/Snow\`
+  - Terrain: \`on Electric/Grassy/Psychic/Misty Terrain\`
+  - Screens: \`with Light Screen/Reflect/Aurora Veil\`
+  - Hazards: \`with Stealth Rock\`, \`with 1 layer of Spikes\`
+  - Other: \`under Gravity\`
 \`!cat sets <pokemon>\` - Get sets for a Pokemon (default: gen9ou)
 \`!cat sets <format> <pokemon>\` - Get sets for a Pokemon in specific format
 \`!cat set <format> <pokemon> <set name>\` - Get a specific set
 \`!cat formats\` - List available formats
-\`!cat help\` - Show this help message`;
-  await message.channel.send(helpMessage);
+\`!cat help\` - Show this help message
+
+**Example:** \`!cat calc 252+ Atk Garchomp @ Choice Band using Earthquake vs 252 HP / 4 Def Toxapex in Sand with Stealth Rock\``;
+    await message.channel.send(helpMessage);
   }
 });
 
