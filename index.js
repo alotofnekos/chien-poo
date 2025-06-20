@@ -123,7 +123,7 @@ function parseCalcInput(rawInput) {
     // Remove Spikes
     .replace(/\b(?:and\s+)?(?:\d+\s+)?layers?\s+of\s+Spikes/gi, '')
     // Remove Gravity
-    .replace(/\bunder\s+Gravity/i/gi, '')
+    .replace(/\bunder\s+Gravity/gi, '')
     .trim();
 
 
