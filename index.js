@@ -298,8 +298,18 @@ bot.on('messageCreate', async message => {
     } = fieldData;
 
     const gen = Generations.get(9);
-    const field = new Field({ weather, terrain, isLightScreen, isReflect, isAuroraVeil, isSR, spikes, isGravity });
-
+    const field = new Field({
+                  weather,
+                  terrain,
+                  isGravity,
+                  defenderSide: {
+                    isLightScreen,
+                    isReflect,
+                    isAuroraVeil,
+                    isSR,
+                    spikes
+                  }
+                });
     try {
       var atk = new Pokemon(gen, attacker.name, {
         item: attacker.item || undefined,
