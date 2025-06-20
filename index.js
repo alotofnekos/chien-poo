@@ -30,7 +30,7 @@ function statMap(stat) {
 
 function detectNatureFromEVs(str) {
   // Look for patterns like "252+ SpA" or "252- Atk"
-  const matches = [...str.matchAll(/(\d+)([+\-])\s*(HP|Atk|Def|SpA|SpD|Spe)/gi)];
+  const matches = [...str.matchAll(/(\d+)([+\-])\s*(HP|Atk|Def|SpA|SpD|Spe)/i)];
   let plus = null, minus = null;
 
   for (const [, , sign, stat] of matches) {
@@ -113,17 +113,17 @@ function parseCalcInput(rawInput) {
 
   let cleanedInputForPokemon = rawInput
     // Remove weather
-    .replace(/\b(in|under)\s+(Rain|Sun|Sand|Hail|Snow)/gi, '')
+    .replace(/\b(in|under)\s+(Rain|Sun|Sand|Hail|Snow)/i, '')
     // Remove terrain
-    .replace(/\b(on)\s+(Electric|Grassy|Psychic|Misty)\s+Terrain/gi, '')
+    .replace(/\b(on)\s+(Electric|Grassy|Psychic|Misty)\s+Terrain/i, '')
     // Remove screens
-    .replace(/\bunder\s+(Light Screen|Reflect|Aurora Veil)/gi, '')
+    .replace(/\bunder\s+(Light Screen|Reflect|Aurora Veil)/i, '')
     // Remove Stealth Rock
-    .replace(/\bafter\s+Stealth Rock/gi, '')
+    .replace(/\bafter\s+Stealth Rock/i, '')
     // Remove Spikes
-    .replace(/\b(?:and\s+)?(?:\d+\s+)?layers?\s+of\s+Spikes/gi, '')
+    .replace(/\b(?:and\s+)?(?:\d+\s+)?layers?\s+of\s+Spikes/i, '')
     // Remove Gravity
-    .replace(/\bunder\s+Gravity/gi, '')
+    .replace(/\bunder\s+Gravity/i, '')
     .trim();
 
 
@@ -143,7 +143,7 @@ function parseCalcInput(rawInput) {
     const ability = abilityMatch ? abilityMatch[1].trim() : null;
 
     // Parse EVs and boosts - updated regex to handle + and - as nature indicators
-    const evMatches = [...str.matchAll(/(\d+)([+\-]?)\s*(HP|Atk|Def|SpA|SpD|Spe)/gi)];
+    const evMatches = [...str.matchAll(/(\d+)([+\-]?)\s*(HP|Atk|Def|SpA|SpD|Spe)/i)];
     for (const [, rawVal, sign, stat] of evMatches) {
       const val = parseInt(rawVal);
       const mappedStat = statMap(stat);
@@ -164,8 +164,8 @@ function parseCalcInput(rawInput) {
 
     // Clean the string by removing EV/nature patterns and abilities
     const cleaned = str
-      .replace(/(\d+)[+\-]?\s*(HP|Atk|Def|SpA|SpD|Spe)\s*\/?\s*/gi, '')
-      .replace(/[+\-]\d+\s*(HP|Atk|Def|SpA|SpD|Spe)/gi, '')
+      .replace(/(\d+)[+\-]?\s*(HP|Atk|Def|SpA|SpD|Spe)\s*\/?\s*/i, '')
+      .replace(/[+\-]\d+\s*(HP|Atk|Def|SpA|SpD|Spe)/i, '')
       .replace(/\([^)]+\)/g, '') // Remove ability in parentheses
       .trim();
 
