@@ -92,7 +92,7 @@ function parseField(rawInput) {
   const screensMatch = rawInput.match(/\bunder\s+(Light Screen|Reflect|Aurora Veil)/i);
   const srMatch = rawInput.match(/\bafter\s+Stealth Rock/i);
   const spikesMatch = rawInput.match(/(\d)\s+layers?\s+of\s+Spikes/i);
-  const critMatch = rawInput.match(/\bon\s+a\s+critical\s+hit/i);
+  const gravity = rawInput.match(/\bunder\s+Gravity/i);
 
   return {
     weather: weatherMatch ? weatherMatch[1] : undefined,
@@ -102,7 +102,7 @@ function parseField(rawInput) {
     isAuroraVeil: screensMatch?.[1] === 'Aurora Veil',
     isSR: !!srMatch,
     spikes: spikesMatch ? parseInt(spikesMatch[1], 10) : 0,
-    isCriticalHit: !!critMatch
+    isGravity: !!gravity
   };
 }
 
@@ -122,8 +122,8 @@ function parseCalcInput(rawInput) {
     .replace(/\bafter\s+Stealth Rock/gi, '')
     // Remove Spikes
     .replace(/\b(?:and\s+)?(?:\d+\s+)?layers?\s+of\s+Spikes/gi, '')
-    // Remove critical hit mention
-    .replace(/\bon\s+a\s+critical\s+hit/gi, '')
+    // Remove Gravity
+    .replace(/\bunder\s+Gravity/i/gi, '')
     .trim();
 
 
@@ -294,12 +294,12 @@ bot.on('messageCreate', async message => {
       isAuroraVeil,
       isSR,
       spikes,
-      isCriticalHit
+      isGravity
     } = fieldData;
 
 
     const gen = Generations.get(9);
-    const field = new Field({ weather, terrain, isLightScreen, isReflect, isAuroraVeil, isSR, spikes, isCriticalHit });
+    const field = new Field({ weather, terrain, isLightScreen, isReflect, isAuroraVeil, isSR, spikes, isGravity });
 
     try {
       var atk = new Pokemon(gen, attacker.name, {
