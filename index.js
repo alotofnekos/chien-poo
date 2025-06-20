@@ -30,7 +30,7 @@ function statMap(stat) {
 
 function detectNatureFromEVs(str) {
   // Look for patterns like "252+ SpA" or "252- Atk"
-  const matches = [...str.matchAll(/(\d+)([+\-])\s*(HP|Atk|Def|SpA|SpD|Spe)/i)];
+  const matches = [...str.matchAll(/(\d+)([+\-])\s*(HP|Atk|Def|SpA|SpD|Spe)/gi)];
   let plus = null, minus = null;
 
   for (const [, , sign, stat] of matches) {
@@ -143,7 +143,7 @@ function parseCalcInput(rawInput) {
     const ability = abilityMatch ? abilityMatch[1].trim() : null;
 
     // Parse EVs and boosts - updated regex to handle + and - as nature indicators
-    const evMatches = [...str.matchAll(/(\d+)([+\-]?)\s*(HP|Atk|Def|SpA|SpD|Spe)/i)];
+    const evMatches = [...str.matchAll(/(\d+)([+\-]?)\s*(HP|Atk|Def|SpA|SpD|Spe)/gi)];
     for (const [, rawVal, sign, stat] of evMatches) {
       const val = parseInt(rawVal);
       const mappedStat = statMap(stat);
