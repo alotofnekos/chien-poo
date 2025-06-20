@@ -97,13 +97,15 @@ function parseField(rawInput) {
   return {
     weather: weatherMatch ? weatherMatch[1] : undefined,
     terrain: terrainMatch ? terrainMatch[1] : undefined,
-    isLightScreen: screensMatch?.[1] === 'Light Screen',
-    isReflect: screensMatch?.[1] === 'Reflect',
-    isAuroraVeil: screensMatch?.[1] === 'Aurora Veil',
-    isSR: !!srMatch,
-    spikes: spikesMatch ? parseInt(spikesMatch[1], 10) : 0,
-    isGravity: !!gravityMatch
-  };
+    isGravity: !!gravityMatch,
+    defenderSide: {
+      isLightScreen: screensMatch?.[1] === 'Light Screen',
+      isReflect: screensMatch?.[1] === 'Reflect',
+      isAuroraVeil: screensMatch?.[1] === 'Aurora Veil',
+      isSR: !!srMatch,
+      spikes: spikesMatch ? parseInt(spikesMatch[1], 10) : 0
+    }
+  }
 }
 
 function parseCalcInput(rawInput) {
