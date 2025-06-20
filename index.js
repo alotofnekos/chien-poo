@@ -164,8 +164,8 @@ function parseCalcInput(rawInput) {
 
     // Clean the string by removing EV/nature patterns and abilities
     const cleaned = str
-      .replace(/(\d+)[+\-]?\s*(HP|Atk|Def|SpA|SpD|Spe)\s*\/?\s*/i, '')
-      .replace(/[+\-]\d+\s*(HP|Atk|Def|SpA|SpD|Spe)/i, '')
+      .replace(/(\d+)[+\-]?\s*(HP|Atk|Def|SpA|SpD|Spe)\s*\/?\s*/gi, '')
+      .replace(/[+\-]\d+\s*(HP|Atk|Def|SpA|SpD|Spe)/gi, '')
       .replace(/\([^)]+\)/g, '') // Remove ability in parentheses
       .trim();
 
