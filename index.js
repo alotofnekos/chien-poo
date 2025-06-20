@@ -214,8 +214,8 @@ async function fetchSetsData(format) {
   }
 }
 
-function getSmogonGenCode(gen: number): string {
-  const genMap: Record<number, string> = {
+function getSmogonGenCode(gen) {
+  const genMap = {
     9: 'sv',
     8: 'ss',
     7: 'sm',
@@ -229,11 +229,11 @@ function getSmogonGenCode(gen: number): string {
   return genMap[gen] || 'sv'; // default to SV if unknown
 }
 
-function formatSpeciesForUrl(species: string): string {
-  return species.toLowerCase().replace(/\s/g, '-').replace(/[’']/g, '');
+function formatSpeciesForUrl(species) {
+  return species.toLowerCase().replace(/\s/g, '-').replace(/['']/g, '');
 }
 
-function buildSmogonUrl(species: string, format: string): string | null {
+function buildSmogonUrl(species, format) {
   const match = format.match(/^gen(\d)([a-z0-9]+)$/i);
   if (!match) return null;
 
