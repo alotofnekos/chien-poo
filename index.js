@@ -214,6 +214,37 @@ async function fetchSetsData(format) {
   }
 }
 
+function getSmogonGenCode(gen: number): string {
+  const genMap: Record<number, string> = {
+    9: 'sv',
+    8: 'ss',
+    7: 'sm',
+    6: 'xy',
+    5: 'bw',
+    4: 'dp',
+    3: 'rs',
+    2: 'gs',
+    1: 'rb'
+  };
+  return genMap[gen] || 'sv'; // default to SV if unknown
+}
+
+function formatSpeciesForUrl(species: string): string {
+  return species.toLowerCase().replace(/\s/g, '-').replace(/[’']/g, '');
+}
+
+function buildSmogonUrl(species: string, format: string): string | null {
+  const match = format.match(/^gen(\d)([a-z0-9]+)$/i);
+  if (!match) return null;
+
+  const genNum = parseInt(match[1], 10);
+  const tier = match[2].toLowerCase(); // e.g. 'ou'
+  const genCode = getSmogonGenCode(genNum);
+  const speciesSlug = formatSpeciesForUrl(species);
+
+  return `https://www.smogon.com/dex/${genCode}/pokemon/${speciesSlug}/${tier}/`;
+}
+
 // Function to search for Pokemon sets
 function findPokemonSets(setsData, pokemonName) {
   // Normalize the Pokemon name for searching
@@ -287,14 +318,16 @@ bot.on('messageCreate', async message => {
 
     const { attacker, defender, move, fieldData } = parsed;
     const {
-      weather,
-      terrain,
-      isLightScreen,
-      isReflect,
-      isAuroraVeil,
-      isSR,
-      spikes,
-      isGravity
+            weather,
+            terrain,
+            isGravity,
+            defenderSide: {
+              isLightScreen,
+              isReflect,
+              isAuroraVeil,
+              isSR,
+              spikes
+            }
     } = fieldData;
 
     const gen = Generations.get(9);
@@ -357,18 +390,19 @@ bot.on('messageCreate', async message => {
       const pokemonSets = findPokemonSets(setsData, pokemonName);
 
       if (!pokemonSets) {
-        return message.channel.send(`No sets found for "${pokemonName}" in ${format.toUpperCase()}. Try a different format or check the spelling.`);
+        return message.channel.send(`No sets found for "${pokemonName}" in ${format}. Try a different format or check the spelling.`);
       }
 
       const { species, sets } = pokemonSets;
       const setNames = Object.keys(sets);
 
       if (setNames.length === 0) {
-        return message.channel.send(`No sets available for ${species} in ${format.toUpperCase()}.`);
+        return message.channel.send(`No sets available for ${species} in ${format}.`);
       }
 
       // Show all sets regardless of count
-      let response = `**${species}** sets in **${format.toUpperCase()}**:\n\n`;
+      const smogonUrl = buildSmogonUrl(species, format);
+      let response = `**${species}** sets in **${format}**:\n\n[Smogon Analysis](${smogonUrl})\n\n`;
 
       for (const [setName, setData] of Object.entries(sets)) {
         response += formatMoveset(species, setName, setData) + '\n';
@@ -385,7 +419,7 @@ bot.on('messageCreate', async message => {
 
     } catch (error) {
       console.error('Error fetching sets:', error);
-      await message.channel.send(`Error fetching sets for ${format.toUpperCase()}: ${error.message}`);
+      await message.channel.send(`Error fetching sets for ${format}: ${error.message}`);
     }
   }
 
@@ -407,7 +441,7 @@ bot.on('messageCreate', async message => {
       const pokemonSets = findPokemonSets(setsData, pokemonName);
 
       if (!pokemonSets) {
-        return message.channel.send(`No sets found for "${pokemonName}" in ${format.toUpperCase()}.`);
+        return message.channel.send(`No sets found for "${pokemonName}" in ${format}.`);
       }
 
       const { species, sets } = pokemonSets;
@@ -423,7 +457,8 @@ bot.on('messageCreate', async message => {
       }
 
       const setData = sets[matchingSetName];
-      const response = `**${species}** in **${format.toUpperCase()}**:\n\n${formatMoveset(species, matchingSetName, setData)}`;
+      const smogonUrl = buildSmogonUrl(species, format);
+      const response = `**${species}** in **${format}**:\n[Smogon Analysis](${smogonUrl})\n\n${formatMoveset(species, matchingSetName, setData)}`;
 
       await message.channel.send(response);
 
