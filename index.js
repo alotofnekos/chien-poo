@@ -29,8 +29,8 @@ function statMap(stat) {
 }
 
 function detectNatureFromEVs(str) {
-  // Look for patterns like "252+ SpA" or "252- Atk"
-  const matches = [...str.matchAll(/(\d+)\s*([+\-])\s*(HP|Atk|Def|SpA|SpD|Spe)/gi)];
+  const regex = new RegExp('(\\d+)\\s*([+\\-])\\s*(HP|Atk|Def|SpA|SpD|Spe)', 'gi');
+  const matches = [...str.matchAll(regex)];
   let plus = null, minus = null;
 
   for (const [, , sign, stat] of matches) {
