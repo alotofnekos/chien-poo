@@ -467,24 +467,7 @@ bot.on('messageCreate', async message => {
       await message.channel.send(`Error fetching set: ${error.message}`);
     }
   }
-
-  // Handle the 'cat formats' command
-  else if (content === '!cat formats') {
-    const commonFormats = [
-      'gen9ou - Gen 9 OverUsed',
-      'gen9uu - Gen 9 UnderUsed',
-      'gen9ru - Gen 9 RarelyUsed',
-      'gen9nu - Gen 9 NeverUsed',
-      'gen9monotype - Gen 9 Monotype',
-      'gen9ubers - Gen 9 Ubers',
-      'gen9doublesou - Gen 9 Doubles OU',
-      'gen9nationaldexmonotype - Gen 9 National Dex Monotype',
-      'gen9nationaldex - Gen 9 National Dex',
-      'gen9lc - Gen 9 Little Cup'
-    ];
-
-    await message.channel.send(`**Available formats:**\n${commonFormats.join('\n')}\n\nUse \`!cat sets <format> <pokemon>\` to get sets for a specific format.`);
-  }
+  
   // Handle the 'cat' command
   else if (content === '!cat') {
     try {
@@ -513,7 +496,6 @@ bot.on('messageCreate', async message => {
 \`!cat sets <pokemon>\` - Get sets for a Pokemon (default: gen9ou)
 \`!cat sets <format> <pokemon>\` - Get sets for a Pokemon in specific format
 \`!cat set <format> <pokemon> <set name>\` - Get a specific set
-\`!cat formats\` - List available formats
 \`!cat help\` - Show this help message
 
 **Example:** \`!cat calc 252+ Atk Garchomp @ Choice Band using Earthquake vs 252 HP / 4 Def Toxapex in Sand with Stealth Rock\``;
