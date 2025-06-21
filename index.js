@@ -133,7 +133,7 @@ function parseCalcInput(rawInput) {
   const [, attackerStr, move, defenderStr] = match;
 
   function parseSide(str) {
-    const evs = {}, boosts = {};
+    const evs = {}, boosts = {}, natureHints = {};
 
     // Parse nature from + and - indicators
     const natureData = detectNatureFromEVs(str);
@@ -142,7 +142,7 @@ function parseCalcInput(rawInput) {
     const abilityMatch = str.match(/\(([^)]+)\)/);
     const ability = abilityMatch ? abilityMatch[1].trim() : null;
 
-    // Parse EVs and boosts - updated regex to handle + and - as nature indicators
+    // Parse EVs and boosts
     const evMatches = [...str.matchAll(/([+-]\d+)?\s*(\d+)?([+-]?)\s*(HP|Atk|Def|SpA|SpD|Spe)/gi)];
     for (const [, boostPart, rawEV, evSign, stat] of evMatches) {
       const mappedStat = statMap(stat);
@@ -161,19 +161,28 @@ function parseCalcInput(rawInput) {
           natureHints[mappedStat] = evSign;
         }
       }
+    }
 
-    // Clean the string by removing EV/nature patterns and abilities
-  const cleaned = str
-    .replace(/([+-]\d+)?\s*\d*[+-]?\s*(HP|Atk|Def|SpA|SpD|Spe)(?:\s*\/\s*)?/gi, '')
-    .replace(/\([^)]+\)/g, '') // ability in parentheses
-    .replace(/\s+/g, ' ')
-    .trim();
-
+    // Clean the string
+    const cleaned = str
+      .replace(/([+-]\d+)?\s*\d*[+-]?\s*(HP|Atk|Def|SpA|SpD|Spe)(?:\s*\/\s*)?/gi, '')
+      .replace(/\([^)]+\)/g, '') // remove ability
+      .replace(/\s+/g, ' ')
+      .trim();
 
     const [name, item] = cleaned.split('@').map(s => s.trim());
-    return { name, item: item || '', evs, boosts, nature: natureData, ability };
+
+    return {
+      name,
+      item: item || '',
+      evs,
+      boosts,
+      nature: natureData,
+      ability
+    };
   }
 
+  // Example usage (probably inside parseCalcInput)
   return {
     attacker: parseSide(attackerStr),
     move: move.trim(),
@@ -181,6 +190,7 @@ function parseCalcInput(rawInput) {
     fieldData: fieldData
   };
 }
+
 
 // Function to fetch sets data from Smogon API
 async function fetchSetsData(format) {
