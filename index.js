@@ -143,32 +143,32 @@ function parseCalcInput(rawInput) {
     const ability = abilityMatch ? abilityMatch[1].trim() : null;
 
     // Parse EVs and boosts - updated regex to handle + and - as nature indicators
-    const evMatches = [...str.matchAll(/(\d+)([+\-]?)\s*(HP|Atk|Def|SpA|SpD|Spe)/gi)];
-    for (const [, rawVal, sign, stat] of evMatches) {
-      const val = parseInt(rawVal);
+    const evMatches = [...str.matchAll(/([+-]\d+)?\s*(\d+)?([+-]?)\s*(HP|Atk|Def|SpA|SpD|Spe)/gi)];
+    for (const [, boostPart, rawEV, evSign, stat] of evMatches) {
       const mappedStat = statMap(stat);
 
-      // If it's just a number with +/- (like 252+), it's EVs with nature indicator
-      if (sign === '+' || sign === '-') {
-        evs[mappedStat] = val;
+      // Handle boost like "+2" or "-1"
+      if (boostPart) {
+        boosts[mappedStat] = parseInt(boostPart);
       }
-      // If it's a number with explicit boost notation (like +1, -2)
-      else if (/^[+-]\d+$/.test(rawVal)) {
-        boosts[mappedStat] = parseInt(rawVal);
+
+      // Handle EVs (like "252" or "252+")
+      if (rawEV) {
+        evs[mappedStat] = parseInt(rawEV);
+
+        // Handle nature indicator (e.g., 252+ means increased nature)
+        if (evSign === '+' || evSign === '-') {
+          natureHints[mappedStat] = evSign;
+        }
       }
-      // Otherwise it's just EVs
-      else {
-        evs[mappedStat] = val;
-      }
-    }
 
     // Clean the string by removing EV/nature patterns and abilities
-    const cleaned = str
-      .replace(/(\d+)\s*[+\-]?\s*(HP|Atk|Def|SpA|SpD|Spe)(?:\s*\/\s*)?/gi, '') // Remove EVs with optional +/- nature indicators
-      .replace(/[+\-]\d+\s*(HP|Atk|Def|SpA|SpD|Spe)/gi, '') // Remove explicit boosts
-      .replace(/\([^)]+\)/g, '') // Remove ability in parentheses
-      .replace(/\s+/g, ' ') // Normalize whitespace
-      .trim();
+  const cleaned = str
+    .replace(/([+-]\d+)?\s*\d*[+-]?\s*(HP|Atk|Def|SpA|SpD|Spe)(?:\s*\/\s*)?/gi, '')
+    .replace(/\([^)]+\)/g, '') // ability in parentheses
+    .replace(/\s+/g, ' ')
+    .trim();
+
 
     const [name, item] = cleaned.split('@').map(s => s.trim());
     return { name, item: item || '', evs, boosts, nature: natureData, ability };
@@ -459,7 +459,6 @@ bot.on('messageCreate', async message => {
       const setData = sets[matchingSetName];
       const smogonUrl = buildSmogonUrl(species, format);
       const response = `**${species}** in **${format}**:\n[Smogon Analysis](${smogonUrl})\n\n${formatMoveset(species, matchingSetName, setData)}`;
-
       await message.channel.send(response);
 
     } catch (error) {
@@ -467,7 +466,7 @@ bot.on('messageCreate', async message => {
       await message.channel.send(`Error fetching set: ${error.message}`);
     }
   }
-  
+
   // Handle the 'cat' command
   else if (content === '!cat') {
     try {
