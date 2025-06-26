@@ -494,54 +494,47 @@ bot.on('messageCreate', async message => {
   }
 
 else if (content.toLowerCase().startsWith('!cat stats')) {
-  const args = content.split(' ').slice(2); // Everything after '!cat stats'
-  const pokemonName = args.join('-').toLowerCase(); // Join with hyphens for PokéAPI format
+  const args = content.split(' ').slice(2);
+  const pokemonName = args.join('-').toLowerCase();
 
   if (!pokemonName) {
     await message.channel.send('Please provide a Pokémon name. Usage: `!cat stats chien-pao`');
     return;
   }
 
-  let response = ''; // <-- Moved here so it's accessible throughout
-
   if (pokemonName.includes('flutter-mane')) {
-    await message.channel.send('😿 Flutter Mane is evil meow, cant you check a different mon instead...?');
+    await message.channel.send('Flutter Mane is evil meow, cant you check a different mon instead...?');
     await message.channel.sendTyping();
     await new Promise(resolve => setTimeout(resolve, 2000)); 
-    await message.channel.send('...Neko will get mad at meow if I dont send it...*');
+    await message.channel.send('...Neko will get mad at meow if I dont send it meow 😿😿😿');
     await message.channel.sendTyping();
-    await new Promise(resolve => setTimeout(resolve, 3000)); 
+    await new Promise(resolve => setTimeout(resolve, 2000)); 
   }
 
-
   try {
-      const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${pokemonName}`);
-      if (!res.ok) {
-        throw new Error('Pokémon not found');
-      }
+    const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${pokemonName}`);
+    if (!res.ok) {
+      throw new Error('Pokémon not found');
+    }
 
-      const data = await res.json();
+    const data = await res.json();
 
-      // Extract base stats
-      const stats = data.stats.map(stat => `${stat.stat.name}: ${stat.base_stat}`).join('\n');
+    const stats = data.stats.map(stat => `${stat.stat.name}: ${stat.base_stat}`).join('\n');
+    const abilities = data.abilities.map(ability => ability.ability.name).join(', ');
+    const image = data.sprites.other['official-artwork'].front_default || data.sprites.front_default;
 
-      // Extract abilities
-      const abilities = data.abilities.map(ability => ability.ability.name).join(', ');
+    const finalResponse = `**Stats for ${data.name.charAt(0).toUpperCase() + data.name.slice(1)}**
+**Abilities:** ${abilities}
+**Base Stats:**\n${stats}`;
 
-      // Image (official artwork or fallback sprite)
-      const image = data.sprites.other['official-artwork'].front_default || data.sprites.front_default;
-
-      response += `**Stats for ${data.name.charAt(0).toUpperCase() + data.name.slice(1)}**
-  **Abilities:** ${abilities}
-  **Base Stats:**\n${stats}`;
-
-      await message.channel.send({ content: response, files: [image] });
+      await message.channel.send({ content: finalResponse, files: [image] });
 
     } catch (e) {
       await message.channel.send(`😿 Could not find stats for "${pokemonName.replace(/-/g, ' ')}". Does this meown exist?`);
       console.error('Error fetching Pokémon data:', e);
     }
   }
+
 
 
 
