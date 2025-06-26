@@ -492,6 +492,46 @@ bot.on('messageCreate', async message => {
       console.error('Error fetching cat:', e);
     }
   }
+
+  else if (content.startsWith('!cat stats')) {
+    const args = content.split(' ');
+    const pokemonName = args[2]?.toLowerCase();
+
+    if (!pokemonName) {
+      await message.channel.send('Please provide a Pokémon name. Usage: `!cat stats chien-pao`');
+      return;
+    }
+
+    try {
+      const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${pokemonName}`);
+      if (!res.ok) {
+        throw new Error('Does this Pokemon exist meow?');
+      }
+
+      const data = await res.json();
+
+      // Extract base stats
+      const stats = data.stats.map(stat => `${stat.stat.name}: ${stat.base_stat}`).join('\n');
+
+      // Extract abilities
+      const abilities = data.abilities.map(ability => ability.ability.name).join(', ');
+
+      // Image (official artwork or sprite fallback)
+      const image = data.sprites.other['official-artwork'].front_default || data.sprites.front_default;
+
+      const response = `📊 **Stats for ${data.name.charAt(0).toUpperCase() + data.name.slice(1)}**
+  **Abilities:** ${abilities}
+  **Base Stats:**
+  ${stats}`;
+
+      await message.channel.send({ content: response, files: [image] });
+
+    } catch (e) {
+      await message.channel.send(`😿 Could not find stats for "${pokemonName}". Please check the spelling.`);
+      console.error('Error fetching Pokémon data:', e);
+    }
+  }
+
   // Handle help command
   else if (content === '!cat help') {
     const helpMessage = `**Cat Bot Commands:**
