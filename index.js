@@ -493,19 +493,22 @@ bot.on('messageCreate', async message => {
     }
   }
 
-  else if (content.startsWith('!cat stats')) {
-    const args = content.split(' ');
-    const pokemonName = args[2]?.toLowerCase();
+  else if (content.toLowerCase().startsWith('!cat stats')) {
+    const args = content.split(' ').slice(2); // Everything after '!cat stats'
+    const pokemonName = args.join('-').toLowerCase(); // Join with hyphens for PokéAPI format
 
     if (!pokemonName) {
       await message.channel.send('Please provide a Pokémon name. Usage: `!cat stats chien-pao`');
       return;
     }
+    if (pokemonName.includes('Flutter Mane')) {
+      await message.channel.send('😿 Flutter Mane is evil meow, cant you check a different mon instead?');
+    }
 
     try {
       const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${pokemonName}`);
       if (!res.ok) {
-        throw new Error('Does this Pokemon exist meow?');
+        throw new Error('Pokémon not found');
       }
 
       const data = await res.json();
@@ -516,21 +519,21 @@ bot.on('messageCreate', async message => {
       // Extract abilities
       const abilities = data.abilities.map(ability => ability.ability.name).join(', ');
 
-      // Image (official artwork or sprite fallback)
+      // Image (official artwork or fallback sprite)
       const image = data.sprites.other['official-artwork'].front_default || data.sprites.front_default;
 
-      const response = `📊 **Stats for ${data.name.charAt(0).toUpperCase() + data.name.slice(1)}**
+      const response = `**Stats for ${data.name.charAt(0).toUpperCase() + data.name.slice(1)}**
   **Abilities:** ${abilities}
-  **Base Stats:**
-  ${stats}`;
+  **Base Stats:**\n${stats}`;
 
       await message.channel.send({ content: response, files: [image] });
 
     } catch (e) {
-      await message.channel.send(`😿 Could not find stats for "${pokemonName}". Please check the spelling.`);
+      await message.channel.send(`😿 Could not find stats for "${pokemonName.replace(/-/g, ' ')}". Does this meown exist?`);
       console.error('Error fetching Pokémon data:', e);
     }
   }
+
 
   // Handle help command
   else if (content === '!cat help') {
