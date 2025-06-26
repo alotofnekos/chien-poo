@@ -502,7 +502,10 @@ bot.on('messageCreate', async message => {
       return;
     }
     if (pokemonName.includes('Flutter Mane')) {
-      await message.channel.send('😿 Flutter Mane is evil meow, cant you check a different mon instead?');
+      const response = '😿 Flutter Mane is evil meow, cant you check a different mon instead?';
+    }
+    else{
+      const response = '';
     }
 
     try {
@@ -522,9 +525,9 @@ bot.on('messageCreate', async message => {
       // Image (official artwork or fallback sprite)
       const image = data.sprites.other['official-artwork'].front_default || data.sprites.front_default;
 
-      const response = `**Stats for ${data.name.charAt(0).toUpperCase() + data.name.slice(1)}**
-  **Abilities:** ${abilities}
-  **Base Stats:**\n${stats}`;
+      response += `**Stats for ${data.name.charAt(0).toUpperCase() + data.name.slice(1)}**
+**Abilities:** ${abilities}
+**Base Stats:**\n${stats}`;
 
       await message.channel.send({ content: response, files: [image] });
 
