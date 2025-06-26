@@ -505,8 +505,14 @@ else if (content.toLowerCase().startsWith('!cat stats')) {
   let response = ''; // <-- Moved here so it's accessible throughout
 
   if (pokemonName.includes('flutter-mane')) {
-    response = '😿 Flutter Mane is evil meow, cant you check a different mon instead?';
+    await message.channel.send('😿 Flutter Mane is evil meow, cant you check a different mon instead...?');
+    await message.channel.sendTyping();
+    await new Promise(resolve => setTimeout(resolve, 2000)); 
+    await message.channel.send('...Neko will get mad at meow if I dont send it...*');
+    await message.channel.sendTyping();
+    await new Promise(resolve => setTimeout(resolve, 3000)); 
   }
+
 
   try {
       const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${pokemonName}`);
